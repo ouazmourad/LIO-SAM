@@ -14,7 +14,7 @@
 #include <gtsam/nonlinear/Marginals.h>
 #include <gtsam/nonlinear/Values.h>
 #include <gtsam/inference/Symbol.h>
-
+#include <rosbag/bag.h>
 #include <gtsam/nonlinear/ISAM2.h>
 
 using namespace gtsam;
@@ -72,7 +72,7 @@ public:
     ros::Publisher pubRecentKeyFrame;
     ros::Publisher pubCloudRegisteredRaw;
     ros::Publisher pubLoopConstraintEdge;
-
+    
     ros::Publisher pubSLAMInfo;
 
     ros::Subscriber subCloud;
@@ -80,6 +80,8 @@ public:
     ros::Subscriber subLoop;
 
     ros::ServiceServer srvSaveMap;
+
+    rosbag::Bag bag_out;
 
     std::deque<nav_msgs::Odometry> gpsQueue;
     lio_sam::cloud_info cloudInfo;
@@ -1553,9 +1555,9 @@ public:
         thisPose6D.time = timeLaserInfoCur;
         cloudKeyPoses6D->push_back(thisPose6D);
 
-        // cout << "****************************************************" << endl;
-        // cout << "Pose covariance:" << endl;
-        // cout << isam->marginalCovariance(isamCurrentEstimate.size()-1) << endl << endl;
+        cout << "****************************************************" << endl;
+        cout << "Pose covariance:" << endl;
+        cout << isam->marginalCovariance(isamCurrentEstimate.size()-1) << endl << endl;
         poseCovariance = isam->marginalCovariance(isamCurrentEstimate.size()-1);
 
         // save updated transform
@@ -1642,6 +1644,7 @@ public:
         laserOdometryROS.pose.pose.position.z = transformTobeMapped[5];
         laserOdometryROS.pose.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]);
         pubLaserOdometryGlobal.publish(laserOdometryROS);
+        bag_out.write("/liosam_odometry",laserOdometryROS.header.stamp,laserOdometryROS);
         
         // Publish TF
         static tf::TransformBroadcaster br;
@@ -1733,6 +1736,8 @@ public:
             globalPath.header.stamp = timeLaserInfoStamp;
             globalPath.header.frame_id = odometryFrame;
             pubPath.publish(globalPath);
+            std::string out_bag_name = "/tmp/odometry_liosam_bag.bag";
+            bag_out.open(out_bag_name, rosbag::bagmode::Write);
         }
         // publish SLAM infomation for 3rd-party usage
         static int lastSLAMInfoPubSize = -1;
